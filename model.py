@@ -63,7 +63,7 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        epoch_loss += loss
+        epoch_loss += loss.item()
     epoch_loss /= len(train_loader)
     train_losses.append(epoch_loss)
     model.eval()
@@ -74,6 +74,14 @@ for epoch in range(epochs):
             batch_y = batch_y.to(device)
             y_pred = model(batch_x)
             loss = cirtersion(y_pred, batch_y)
-            epoch_loss += loss
+            epoch_loss += loss.item()
         epoch_loss /= len(test_loader)
         test_losses.append(epoch_loss)
+
+plt.plot(range(epochs), train_losses, label="train")
+plt.plot(range(epochs), test_losses, label="test")
+plt.title("test and train loss")
+plt.xlabel("epoch")
+plt.ylabel("loss")
+plt.legend()
+plt.show()
