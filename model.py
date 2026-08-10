@@ -2,7 +2,7 @@ import pandas as pd
 from torch.utils.data import DataLoader, TensorDataset
 import torch
 import torch.nn as nn
-import torch.optim
+import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
@@ -44,6 +44,36 @@ class ClassficaitionModel(nn.Module):
         x = self.fc4(x)
         return x
 
+epochs = 100
+train_losses = []
+test_losses = []
+model = ClassficaitionModel(x_train_tensor.shape[1])
+model.to(device)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+cirtersion = nn.BCEWithLogitsLoss()
 
-
-    
+for epoch in range(epochs):
+    model.train()
+    epoch_loss = 0
+    for batch_x, batch_y in train_loader:
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+        y_pred = model(batch_x)
+        loss = cirtersion(y_pred, batch_y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss
+    epoch_loss /= len(train_loader)
+    train_losses.append(epoch_loss)
+    model.eval()
+    epoch_loss = 0
+    with torch.no_grad():
+        for batch_x, batch_y in test_loader:
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
+            y_pred = model(batch_x)
+            loss = cirtersion(y_pred, batch_y)
+            epoch_loss += loss
+        epoch_loss /= len(test_loader)
+        test_losses.append(epoch_loss)
