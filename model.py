@@ -7,6 +7,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
-def main():
-    df = pd.read_csv("diabetes_prediction_dataset_cleaned.csv")
+df = pd.read_csv("diabetes_prediction_dataset_cleaned.csv")
+x = df.drop("diabetes", axis=1)
+y = df["diabetes"]
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2, random_state=42)
+
     
