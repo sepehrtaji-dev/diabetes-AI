@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report, roc_auc_score, precision_recall_curve
 import matplotlib.pyplot as plt
 from os import getcwd, chdir
 chdir("""C:\\Users\\Morteza\\Desktop\\projects\\AI course\\trains\\s6""")
@@ -51,7 +51,19 @@ test_losses = []
 model = ClassficaitionModel(x_train_tensor.shape[1])
 model.to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-cirtersion = nn.BCEWithLogitsLoss()
+
+# The diabetes dataset is typically imbalanced (far fewer positive cases
+# than negative). BCEWithLogitsLoss treats every mistake equally by
+# default, so the model can get away with missing positives. pos_weight
+# scales up the loss on positive examples, which is the main reason
+# recall was low — the model just wasn't penalized enough for false
+# negatives.
+n_pos = (y_train == 1).sum()
+n_neg = (y_train == 0).sum()
+pos_weight_value = n_neg / n_pos
+print(f"Class balance -> negatives: {n_neg}, positives: {n_pos}, pos_weight: {pos_weight_value:.2f}")
+pos_weight = torch.tensor([pos_weight_value], dtype=torch.float32, device=device)
+cirtersion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
 for epoch in range(epochs):
     model.train()
@@ -80,7 +92,6 @@ for epoch in range(epochs):
         test_losses.append(epoch_loss)
     if epoch % 10 == 0:
         print(f"epoch : {epoch}/100")
-all_preds = []
 all_labels = []
 all_probs = []
 test_loss = 0
@@ -94,13 +105,30 @@ with torch.no_grad():
         test_loss += loss.item()
         
         probs = torch.sigmoid(outputs).cpu().numpy().flatten()
-        preds = (probs > 0.5).astype(int)
         
         all_probs.extend(probs)
-        all_preds.extend(preds)
         all_labels.extend(y_batch.cpu().numpy().flatten())
 
 test_loss /= len(test_loader)
+
+# --- Threshold tuning ---
+# A fixed 0.5 cutoff is arbitrary. Since the goal here is higher recall,
+# scan the precision/recall curve and pick the lowest threshold that
+# reaches TARGET_RECALL, keeping whatever precision is left at that
+# point. Raise TARGET_RECALL for even higher recall (precision will keep
+# dropping); lower it if the resulting precision becomes unusable.
+TARGET_RECALL = 0.85
+precisions, recalls, thresholds = precision_recall_curve(all_labels, all_probs)
+candidates = [i for i, r in enumerate(recalls[:-1]) if r >= TARGET_RECALL]
+if candidates:
+    best_idx = max(candidates, key=lambda i: precisions[i])
+    best_threshold = thresholds[best_idx]
+else:
+    best_threshold = 0.5
+    print(f"Could not reach target recall of {TARGET_RECALL} at any threshold; using 0.5")
+print(f"Selected decision threshold: {best_threshold:.3f} (target recall: {TARGET_RECALL})")
+
+all_preds = [int(p >= best_threshold) for p in all_probs]
 
 print(f'Test Loss: {test_loss:.4f}')
 print(f'Accuracy: {accuracy_score(all_labels, all_preds):.4f}')
